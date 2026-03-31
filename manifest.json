@@ -1,0 +1,15 @@
+{
+  "name": "Audio Silence Remover",
+  "short_name": "SilenceRem",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#6200ee",
+  "theme_color": "#6200ee",
+  "icons": [
+    {
+      "src": "[https://cdn-icons-png.flaticon.com/512/727/727218.png](https://cdn-icons-png.flaticon.com/512/727/727218.png)",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
