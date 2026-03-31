@@ -2,185 +2,373 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#6200ee">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audio Silence Remover</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- LameJS for MP3 Encoding -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.all.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Roboto', sans-serif; background-color: #f7f9fc; -webkit-tap-highlight-color: transparent; }
-        .android-card { box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-radius: 28px; }
-        .ripple { position: relative; overflow: hidden; }
-        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #6200ee; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        canvas { width: 100%; height: 100px; background: #f1f1f1; border-radius: 16px; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f7f9fc;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .android-card {
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border-radius: 28px;
+        }
+        .ripple {
+            position: relative;
+            overflow: hidden;
+        }
+        .ripple:after {
+            content: "";
+            display: block;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            background-image: radial-gradient(circle, #fff 10%, transparent 10.01%);
+            background-repeat: no-repeat;
+            background-position: 50%;
+            transform: scale(10, 10);
+            opacity: 0;
+            transition: transform .5s, opacity 1s;
+        }
+        .ripple:active:after {
+            transform: scale(0, 0);
+            opacity: .3;
+            transition: 0s;
+        }
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #6200ee;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        canvas {
+            width: 100%;
+            height: 100px;
+            background: #f1f1f1;
+            border-radius: 16px;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8 flex justify-center items-start min-h-screen">
 
     <div class="max-w-md w-full bg-white android-card p-6 md:p-8">
+        <!-- Header -->
         <header class="flex justify-between items-center mb-8">
             <div>
                 <h1 class="text-2xl font-bold text-gray-800">Silence Remover</h1>
-                <p class="text-sm text-gray-500 mt-1">Supports up to 2 hours.</p>
+                <p class="text-sm text-gray-500 mt-1">Supports up to 2 hours of audio.</p>
             </div>
-            <button id="cancelBtn" class="hidden text-gray-400 hover:text-red-500 p-2" title="Reset">
+            <button id="cancelBtn" class="hidden text-gray-400 hover:text-red-500 p-2 transition-colors" title="Cancel and Clear">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
         </header>
 
-        <div id="dropZone" class="border-2 border-dashed border-purple-200 rounded-3xl p-8 text-center cursor-pointer hover:border-purple-400 mb-6">
+        <!-- Upload Area -->
+        <div id="dropZone" class="border-2 border-dashed border-purple-200 rounded-3xl p-8 text-center cursor-pointer hover:border-purple-400 transition-colors mb-6">
             <input type="file" id="audioInput" accept="audio/*" class="hidden">
             <div class="flex flex-col items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-purple-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                 </svg>
-                <span class="text-gray-700 font-medium text-sm">Select Audio File</span>
+                <span class="text-gray-700 font-medium text-sm">Select Audio (Max 2h)</span>
             </div>
         </div>
 
-        <div id="controls" class="hidden space-y-6">
+        <!-- Controls -->
+        <div id="controls" class="hidden space-y-6 animate-in fade-in duration-300">
             <div class="bg-gray-50 p-4 rounded-2xl">
-                <div class="flex justify-between mb-2">
-                    <label class="text-xs font-bold text-gray-500 uppercase">Sensitivity</label>
+                <div class="flex justify-between items-center mb-2">
+                    <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Sensitivity</label>
                     <span id="thresholdVal" class="text-xs font-mono text-purple-600 font-bold">0.01</span>
                 </div>
-                <input type="range" id="threshold" min="0.001" max="0.1" step="0.001" value="0.01" class="w-full h-2">
+                <input type="range" id="threshold" min="0.001" max="0.1" step="0.001" value="0.01" class="w-full h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer">
             </div>
 
-            <button id="processBtn" class="ripple w-full py-4 bg-purple-600 text-white rounded-2xl font-bold text-lg shadow-lg">
+            <div class="bg-gray-50 p-4 rounded-2xl">
+                <div class="flex justify-between items-center mb-2">
+                    <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Min Pause Duration</label>
+                    <span id="minSilenceVal" class="text-xs font-mono text-purple-600 font-bold">0.3s</span>
+                </div>
+                <input type="range" id="minSilence" min="0.1" max="3.0" step="0.1" value="0.3" class="w-full h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer">
+            </div>
+
+            <button id="processBtn" class="ripple w-full py-4 bg-purple-600 text-white rounded-2xl font-bold text-lg shadow-lg hover:bg-purple-700 transition-all flex justify-center items-center gap-3">
                 <span id="btnText">Remove Silence</span>
-                <div id="btnLoader" class="loader hidden mx-auto"></div>
+                <div id="btnLoader" class="loader hidden"></div>
             </button>
         </div>
 
+        <!-- Result Area -->
         <div id="resultArea" class="hidden mt-8 border-t pt-6">
+            <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 text-center">Output Waveform</h3>
             <canvas id="waveformCanvas" class="mb-4"></canvas>
             <audio id="audioPlayer" controls class="w-full mb-4"></audio>
-            <button id="downloadBtn" class="w-full py-4 bg-green-600 text-white rounded-2xl font-bold shadow-lg">
-                DOWNLOAD MP3
+            <button id="downloadBtn" class="w-full py-3 bg-gray-800 text-white rounded-2xl font-bold hover:bg-black transition-colors mb-2">
+                Download MP3
             </button>
-            <p class="text-[10px] text-gray-400 text-center mt-3 uppercase tracking-widest">Tap Download then long-press player if needed</p>
+            <p class="text-[10px] text-gray-400 text-center uppercase tracking-widest">Encoded at 128kbps</p>
         </div>
 
+        <!-- Status Message -->
         <div id="status" class="mt-4 text-center text-xs font-medium text-gray-400 h-4"></div>
     </div>
 
     <script>
-        const audioInput = document.getElementById('audioInput'), dropZone = document.getElementById('dropZone'), controls = document.getElementById('controls'), processBtn = document.getElementById('processBtn'), cancelBtn = document.getElementById('cancelBtn'), btnLoader = document.getElementById('btnLoader'), btnText = document.getElementById('btnText'), status = document.getElementById('status'), resultArea = document.getElementById('resultArea'), audioPlayer = document.getElementById('audioPlayer'), downloadBtn = document.getElementById('downloadBtn'), canvas = document.getElementById('waveformCanvas'), ctx = canvas.getContext('2d'), thresholdInput = document.getElementById('threshold'), thresholdVal = document.getElementById('thresholdVal');
+        const audioInput = document.getElementById('audioInput');
+        const dropZone = document.getElementById('dropZone');
+        const controls = document.getElementById('controls');
+        const processBtn = document.getElementById('processBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const btnLoader = document.getElementById('btnLoader');
+        const btnText = document.getElementById('btnText');
+        const status = document.getElementById('status');
+        const resultArea = document.getElementById('resultArea');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const canvas = document.getElementById('waveformCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const thresholdInput = document.getElementById('threshold');
+        const minSilenceInput = document.getElementById('minSilence');
+        const thresholdVal = document.getElementById('thresholdVal');
+        const minSilenceVal = document.getElementById('minSilenceVal');
 
-        let audioContext, originalBuffer, processedBlob;
+        let audioContext;
+        let originalBuffer;
+        let processedBlob;
 
         thresholdInput.oninput = () => thresholdVal.innerText = thresholdInput.value;
+        minSilenceInput.oninput = () => minSilenceVal.innerText = minSilenceInput.value + 's';
+
         dropZone.onclick = () => audioInput.click();
         audioInput.onchange = handleFileSelect;
-        cancelBtn.onclick = () => location.reload();
+        cancelBtn.onclick = resetApp;
 
         function handleFileSelect(e) {
-            const file = e.target.files[0]; if (!file) return;
-            status.innerText = "Decompressing..."; dropZone.classList.add('hidden'); cancelBtn.classList.remove('hidden');
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            status.innerText = "Decompressing audio...";
+            dropZone.classList.add('hidden');
+            cancelBtn.classList.remove('hidden');
+
             const reader = new FileReader();
             reader.onload = async (ev) => {
                 try {
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
                     originalBuffer = await audioContext.decodeAudioData(ev.target.result);
-                    status.innerText = "Ready to process"; controls.classList.remove('hidden');
-                } catch (err) { status.innerText = "Error loading file."; }
+                    
+                    if (originalBuffer.duration > 7200) {
+                        status.innerText = "Error: Audio exceeds 2-hour limit.";
+                        originalBuffer = null;
+                        return;
+                    }
+
+                    status.innerText = `Loaded: ${formatTime(originalBuffer.duration)}`;
+                    controls.classList.remove('hidden');
+                } catch (err) {
+                    status.innerText = "Decoding failed. Try another format.";
+                }
             };
             reader.readAsArrayBuffer(file);
         }
 
+        function formatTime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            return `${h > 0 ? h + 'h ' : ''}${m}m ${s}s`;
+        }
+
+        function resetApp() {
+            audioInput.value = '';
+            originalBuffer = null;
+            processedBlob = null;
+            if (audioPlayer.src) {
+                URL.revokeObjectURL(audioPlayer.src);
+                audioPlayer.src = '';
+            }
+            controls.classList.add('hidden');
+            resultArea.classList.add('hidden');
+            dropZone.classList.remove('hidden');
+            cancelBtn.classList.add('hidden');
+            status.innerText = "";
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
         processBtn.onclick = async () => {
             if (!originalBuffer) return;
-            setLoading(true); status.innerText = "Processing & Encoding MP3...";
+
+            setLoading(true);
+            status.innerText = "Processing & Encoding MP3...";
+
             setTimeout(async () => {
                 try {
                     const threshold = parseFloat(thresholdInput.value);
-                    const processedBuffer = trimSilence(originalBuffer, threshold, 0.3);
+                    const minSilence = parseFloat(minSilenceInput.value);
+                    
+                    const processedBuffer = trimSilence(originalBuffer, threshold, minSilence);
+                    
+                    if (processedBuffer.length === 0) {
+                        status.innerText = "All audio cut! Reduce sensitivity.";
+                        setLoading(false);
+                        return;
+                    }
+
                     drawWaveform(processedBuffer);
+                    
+                    // Convert to MP3
                     processedBlob = await bufferToMp3(processedBuffer);
-                    audioPlayer.src = URL.createObjectURL(processedBlob);
+                    const url = URL.createObjectURL(processedBlob);
+                    
+                    audioPlayer.src = url;
                     resultArea.classList.remove('hidden');
-                    status.innerText = "Finished!";
-                } catch (err) { status.innerText = "Processing error."; }
+                    status.innerText = `Finished: ${formatTime(processedBuffer.duration)} remaining.`;
+                    
+                    resultArea.scrollIntoView({ behavior: 'smooth' });
+                } catch (err) {
+                    console.error(err);
+                    status.innerText = "Error during MP3 encoding.";
+                }
                 setLoading(false);
             }, 100);
         };
 
         function setLoading(isLoading) {
-            btnLoader.classList.toggle('hidden', !isLoading);
-            btnText.innerText = isLoading ? "" : "Remove Silence";
-            processBtn.disabled = isLoading;
+            if (isLoading) {
+                btnLoader.classList.remove('hidden');
+                btnText.innerText = "Processing...";
+                processBtn.disabled = true;
+                processBtn.classList.add('opacity-70');
+            } else {
+                btnLoader.classList.add('hidden');
+                btnText.innerText = "Remove Silence";
+                processBtn.disabled = false;
+                processBtn.classList.remove('opacity-70');
+            }
         }
 
         function trimSilence(buffer, threshold, minSilenceDuration) {
-            const data = buffer.getChannelData(0), sr = buffer.sampleRate, minSamples = minSilenceDuration * sr;
-            const regions = []; let audible = false, start = 0, silCount = 0;
-            for (let i = 0; i < data.length; i++) {
-                if (Math.abs(data[i]) > threshold) {
-                    if (!audible) { start = i; audible = true; }
-                    silCount = 0;
-                } else if (audible) {
-                    if (++silCount > minSamples) { regions.push({start, end: i-silCount}); audible = false; }
+            const channelData = buffer.getChannelData(0); 
+            const sampleRate = buffer.sampleRate;
+            const minSilenceSamples = minSilenceDuration * sampleRate;
+            
+            const regions = [];
+            let isAudible = false;
+            let start = 0;
+            let silenceCounter = 0;
+
+            for (let i = 0; i < channelData.length; i++) {
+                const amplitude = Math.abs(channelData[i]);
+                if (amplitude > threshold) {
+                    if (!isAudible) {
+                        start = i;
+                        isAudible = true;
+                    }
+                    silenceCounter = 0;
+                } else {
+                    if (isAudible) {
+                        silenceCounter++;
+                        if (silenceCounter > minSilenceSamples) {
+                            regions.push({ start, end: i - silenceCounter });
+                            isAudible = false;
+                        }
+                    }
                 }
             }
-            if (audible) regions.push({start, end: data.length});
-            const total = regions.reduce((a, r) => a + (r.end - r.start), 0);
-            const newBuf = audioContext.createBuffer(buffer.numberOfChannels, total, sr);
+
+            if (isAudible) regions.push({ start, end: channelData.length });
+            if (regions.length === 0) return buffer;
+
+            const totalLength = regions.reduce((acc, r) => acc + (r.end - r.start), 0);
+            const newBuffer = audioContext.createBuffer(buffer.numberOfChannels, totalLength, sampleRate);
+
             for (let c = 0; c < buffer.numberOfChannels; c++) {
-                const oldD = buffer.getChannelData(c), newD = newBuf.getChannelData(c);
-                let off = 0; for (const r of regions) { newD.set(oldD.subarray(r.start, r.end), off); off += (r.end - r.start); }
+                const oldData = buffer.getChannelData(c);
+                const newData = newBuffer.getChannelData(c);
+                let offset = 0;
+                for (const region of regions) {
+                    const segment = oldData.subarray(region.start, region.end);
+                    newData.set(segment, offset);
+                    offset += segment.length;
+                }
             }
-            return newBuf;
+            return newBuffer;
         }
 
         function drawWaveform(buffer) {
-            const data = buffer.getChannelData(0), step = Math.ceil(data.length / canvas.width), amp = canvas.height / 2;
-            ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = '#9333ea';
+            const data = buffer.getChannelData(0);
+            const step = Math.ceil(data.length / canvas.width);
+            const amp = canvas.height / 2;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#9333ea';
             for (let i = 0; i < canvas.width; i++) {
                 let min = 1.0, max = -1.0;
                 for (let j = 0; j < step; j++) {
                     const datum = data[(i * step) + j];
-                    if (datum < min) min = datum; if (datum > max) max = datum;
+                    if (datum < min) min = datum;
+                    if (datum > max) max = datum;
                 }
                 ctx.fillRect(i, (1 + min) * amp, 1, Math.max(1, (max - min) * amp));
             }
         }
 
-        async function bufferToMp3(buffer) {
-            const encoder = new lamejs.Mp3Encoder(buffer.numberOfChannels, buffer.sampleRate, 128);
-            const mp3Data = []; const L = buffer.getChannelData(0), R = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : L;
-            const size = 1152;
-            for (let i = 0; i < L.length; i += size) {
-                const l16 = new Int16Array(size), r16 = new Int16Array(size);
-                for (let j = 0; j < size && (i + j) < L.length; j++) {
-                    l16[j] = L[i + j] * 32767; r16[j] = R[i + j] * 32767;
-                }
-                const buf = encoder.encodeBuffer(l16, r16); if (buf.length > 0) mp3Data.push(buf);
-            }
-            mp3Data.push(encoder.flush());
-            return new Blob(mp3Data, { type: 'audio/mp3' });
-        }
-
-        // CORRECT DOWNLOAD FIX FOR APK
         downloadBtn.onclick = () => {
             if (!processedBlob) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const dataUrl = e.target.result;
-                const newWindow = window.open();
-                newWindow.document.write('<title>Save MP3</title><body style="background:#f7f9fc;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;font-family:sans-serif;text-align:center;padding:20px;">');
-                newWindow.document.write('<h2 style="color:#1f2937">Audio is Ready</h2>');
-                newWindow.document.write('<audio controls src="' + dataUrl + '" style="width:100%;margin:20px 0;"></audio>');
-                newWindow.document.write('<a href="' + dataUrl + '" download="silence_removed.mp3" style="background:#16a34a;color:white;padding:20px 40px;text-decoration:none;border-radius:15px;font-weight:bold;font-size:18px;display:block;width:80%;">SAVE TO DOWNLOADS</a>');
-                newWindow.document.write('<p style="margin-top:30px;font-size:14px;color:#6b7280;">If button fails: <br>1. Long-press the player above<br>2. Select "Download audio"</p>');
-                newWindow.document.write('</body>');
-            };
-            reader.readAsDataURL(processedBlob);
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(processedBlob);
+            link.download = "audio_no_silence.mp3";
+            link.click();
         };
+
+        // MP3 Encoding Function
+        async function bufferToMp3(buffer) {
+            const channels = buffer.numberOfChannels;
+            const sampleRate = buffer.sampleRate;
+            const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, 128);
+            const mp3Data = [];
+
+            const samplesL = buffer.getChannelData(0);
+            const samplesR = channels > 1 ? buffer.getChannelData(1) : samplesL;
+
+            const sampleBlockSize = 1152;
+            for (let i = 0; i < samplesL.length; i += sampleBlockSize) {
+                const leftChunk = samplesL.subarray(i, i + sampleBlockSize);
+                const rightChunk = samplesR.subarray(i, i + sampleBlockSize);
+                
+                const l = new Int16Array(leftChunk.length);
+                const r = new Int16Array(rightChunk.length);
+                
+                for(let j=0; j<leftChunk.length; j++) {
+                    l[j] = leftChunk[j] < 0 ? leftChunk[j] * 32768 : leftChunk[j] * 32767;
+                    r[j] = rightChunk[j] < 0 ? rightChunk[j] * 32768 : rightChunk[j] * 32767;
+                }
+
+                const mp3buf = mp3encoder.encodeBuffer(l, r);
+                if (mp3buf.length > 0) mp3Data.push(mp3buf);
+            }
+            
+            const flushBuf = mp3encoder.flush();
+            if (flushBuf.length > 0) mp3Data.push(flushBuf);
+            
+            return new Blob(mp3Data, { type: 'audio/mp3' });
+        }
     </script>
 </body>
 </html>
